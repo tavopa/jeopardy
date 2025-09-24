@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   User, 
@@ -45,6 +45,10 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
   const [users, setUsers] = useState<User[]>([])
   const [gameCountdown, setGameCountdown] = useState(0)
   const [localGameState, setLocalGameState] = useState(gameState)
+  const [winnerCountdown, setWinnerCountdown] = useState(0)
+  const [winnerName, setWinnerName] = useState('')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [isMuted, setIsMuted] = useState(false)
 
   useEffect(() => {
     // WebSocket connection
@@ -62,6 +66,39 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
       websocket.close()
     }
   }, [])
+
+  // Initialize suspense music audio element once on mount
+  useEffect(() => {
+    if (!audioRef.current) {
+      const win: any = typeof window !== 'undefined' ? window : undefined
+      const src = (win && win.__SUSPENSE_URL__) || 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_2f9b7e1b4e.mp3?filename=suspense-ambient-110241.mp3'
+      const audio = new Audio(src)
+      audio.loop = true
+      audio.volume = 0.25
+      audioRef.current = audio
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      }
+    }
+  }, [])
+
+  // Control playback based on game state
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const shouldPlay = isRegistered && localGameState === 'playing' && winnerCountdown === 0 && !isMuted
+    if (shouldPlay) {
+      audio.play().catch(() => {})
+    } else {
+      audio.pause()
+      if (localGameState !== 'playing') {
+        audio.currentTime = 0
+      }
+    }
+  }, [isRegistered, localGameState, winnerCountdown, isMuted])
 
   const handleWebSocketMessage = (data: any) => {
     console.log('Player received WebSocket message:', data)
@@ -101,6 +138,22 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
       case 'game_finished':
         console.log('Game finished')
         setLocalGameState('finished')
+        try {
+          const top = data.leaderboard && data.leaderboard.length > 0 ? data.leaderboard[0] : null
+          setWinnerName(top ? top.name : '')
+        } catch (e) {
+          setWinnerName('')
+        }
+        setWinnerCountdown(10)
+        const wc = setInterval(() => {
+          setWinnerCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(wc)
+              return 0
+            }
+            return prev - 1
+          })
+        }, 1000)
         break
       default:
         console.log('Unknown message type:', data.type)
@@ -311,6 +364,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
         {/* Question Display */}
         {isRegistered && localGameState === 'playing' && currentQuestion && (
           <div className="max-w-4xl mx-auto">
+            
             <GameBoard 
               currentQuestion={currentQuestion}
               questionTimer={questionTimer}
@@ -330,7 +384,30 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
         )}
 
         {/* Game Finished */}
-        {isRegistered && localGameState === 'finished' && (
+        {isRegistered && localGameState === 'finished' && winnerCountdown > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-4xl mx-auto"
+          >
+            <div className="game-board p-8 rounded-2xl text-center">
+              <h2 className="text-4xl font-bold text-yellow-400 mb-4">
+                ¡TENEMOS UN GANADOR!
+              </h2>
+              
+              <p className="text-gray-300 mb-2 text-lg">Mostrando podio en...</p>
+              <motion.div
+                className="timer text-6xl font-black text-red-400"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                {winnerCountdown}
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+
+        {isRegistered && localGameState === 'finished' && winnerCountdown === 0 && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}

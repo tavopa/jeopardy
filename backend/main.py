@@ -231,6 +231,9 @@ async def root():
 
 @app.post("/register", response_model=UserResponse)
 async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    # Reject new registrations if registration is closed
+    if not game_state.get("is_registration_open", False):
+        raise HTTPException(status_code=403, detail="Registration is closed")
     db_user = create_user(db, user)
     return UserResponse(
         id=db_user.id,
@@ -262,8 +265,23 @@ async def start_registration():
 async def start_game(db: Session = Depends(get_db)):
     game_state["is_registration_open"] = False
     game_state["is_game_started"] = True
+    game_state["is_question_active"] = False
+    game_state["current_question"] = None
+    game_state["question_timer"] = 0
     
-    # Load and save questions to database
+    # Reset previous game data to avoid duplicates/loops
+    try:
+        # Clear previous questions and answers
+        db.query(UserAnswer).delete()
+        db.query(Question).delete()
+        # Reset user scores
+        db.query(User).update({User.score: 0})
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error resetting game data: {e}")
+
+    # Load and save fresh questions to database
     questions_data = load_questions()
     for question_data in questions_data:
         save_question(db, question_data)
@@ -278,8 +296,13 @@ async def start_game(db: Session = Depends(get_db)):
 
 @app.post("/start-first-question")
 async def start_first_question(db: Session = Depends(get_db)):
-    # Get first question
-    first_q = db.query(Question).filter(Question.is_active == False).first()
+    # Get first question ordered by ID to ensure deterministic start
+    first_q = (
+        db.query(Question)
+        .filter(Question.is_active == False)
+        .order_by(Question.id.asc())
+        .first()
+    )
     if first_q:
         first_q.is_active = True
         db.commit()
@@ -321,8 +344,18 @@ async def next_question(db: Session = Depends(get_db)):
     for q in all_questions:
         print(f"Question {q.id}: active={q.is_active}, text={q.question_text[:50]}...")
     
-    # Get next question
-    next_q = db.query(Question).filter(Question.is_active == False).first()
+    # Determine next question: pick the next ID after current one
+    current_id = game_state.get("current_question")
+    next_q = None
+    if current_id:
+        next_q = (
+            db.query(Question)
+            .filter(Question.is_active == False, Question.id > current_id)
+            .order_by(Question.id.asc())
+            .first()
+        )
+    
+    # Fallback: if no current or at end, there is no next question
     print(f"Found next question: {next_q}")
     if next_q:
         next_q.is_active = True
@@ -353,6 +386,7 @@ async def next_question(db: Session = Depends(get_db)):
     else:
         # Game finished
         game_state["is_question_active"] = False
+        game_state["is_game_started"] = False
         users = get_users(db)
         leaderboard = sorted(users, key=lambda x: x.score, reverse=True)
         
