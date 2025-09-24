@@ -50,9 +50,12 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isMuted, setIsMuted] = useState(false)
 
+  const API_BASE = (typeof window !== 'undefined' && (window as any).__API_URL__) || (process && process.env && process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:8000'
+  const WS_URL = API_BASE.replace(/^http/i, 'ws') + '/ws'
+
   useEffect(() => {
     // WebSocket connection
-    const websocket = new WebSocket('ws://localhost:8000/ws')
+    const websocket = new WebSocket(WS_URL)
     websocket.onopen = () => {
       console.log('Connected to game server')
     }
@@ -164,7 +167,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
     if (!playerName.trim()) return
 
     try {
-      const response = await fetch('http://localhost:8000/register', {
+      const response = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -189,7 +192,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
     if (!selectedAnswer || !currentQuestion || !userId) return
 
     try {
-      const response = await fetch('http://localhost:8000/submit-answer', {
+      const response = await fetch(`${API_BASE}/submit-answer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +217,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8000/users')
+      const response = await fetch(`${API_BASE}/users`)
       const usersData = await response.json()
       setUsers(usersData)
     } catch (error) {

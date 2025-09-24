@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jeopardy-questions
+  namespace: jeopardy
+data:
+  questions.txt: |
+    ¿Cuál es el lenguaje de programación más popular para desarrollo web?
+    A) Python
+    B) JavaScript
+    C) Java
+    D) C++
+    correcta:B
+
+    ¿Qué framework de JavaScript es desarrollado por Facebook?
+    A) Angular
+    B) Vue.js
+    C) React
+    D) Svelte
+    correcta:C
+
+    ¿Cuál es la base de datos NoSQL más popular?
+    A) MongoDB
+    B) PostgreSQL
+    C) MySQL
+    D) Redis
+    correcta:A
+
+    ¿Qué significa la sigla API?
+    A) Application Programming Interface
+    B) Advanced Programming Interface
+    C) Automated Programming Interface
+    D) Application Process Interface
+    correcta:A
+
+    ¿Cuál es el sistema operativo de código abierto más popular?
+    A) Windows
+    B) macOS
+    C) Linux
+    D) FreeBSD
+    correcta:C
+
+    ¿Qué herramienta se usa para control de versiones?
+    A) SVN
+    B) Git
+    C) Mercurial
+    D) CVS
+    correcta:B
+
+    ¿Cuál es el protocolo estándar para páginas web?
+    A) HTTP
+    B) FTP
+    C) SMTP
+    D) TCP
+    correcta:A
+
+    ¿Qué significa HTML?
+    A) HyperText Markup Language
+    B) High Technology Markup Language
+    C) Home Tool Markup Language
+    D) Hyperlink and Text Markup Language
+    correcta:A
+
+    ¿Cuál es el puerto estándar para HTTPS?
+    A) 80
+    B) 443
+    C) 8080
+    D) 3000
+    correcta:B
+
+    ¿Qué es Docker?
+    A) Un sistema operativo
+    B) Una plataforma de contenedores
+    C) Un lenguaje de programación
+    D) Una base de datos
+    correcta:B
+
+    ¿Cuál es el paradigma de programación que se basa en objetos?
+    A) Programación funcional
+    B) Programación orientada a objetos
+    C) Programación procedural
+    D) Programación lógica
+    correcta:B
+
+    ¿Qué significa CSS?
+    A) Cascading Style Sheets
+    B) Computer Style Sheets
+    C) Creative Style Sheets
+    D) Colorful Style Sheets
+    correcta:A
+
+    ¿Cuál es el algoritmo de ordenamiento más eficiente en promedio?
+    A) Bubble Sort
+    B) Quick Sort
+    C) Selection Sort
+    D) Insertion Sort
+    correcta:B
+
+    ¿Qué es un algoritmo?
+    A) Un programa de computadora
+    B) Un conjunto de reglas para resolver un problema
+    C) Un lenguaje de programación
+    D) Una base de datos
+    correcta:B
+
+    ¿Cuál es el protocolo de correo electrónico más común?
+    A) HTTP
+    B) FTP
+    C) SMTP
+    D) POP3
+    correcta:C

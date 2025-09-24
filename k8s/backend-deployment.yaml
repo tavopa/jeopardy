@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeopardy-backend
+  namespace: jeopardy
+  labels:
+    app: jeopardy-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jeopardy-backend
+  template:
+    metadata:
+      labels:
+        app: jeopardy-backend
+    spec:
+      containers:
+      - name: backend
+        image: jeopardy-backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jeopardy-config
+              key: DATABASE_URL
+        volumeMounts:
+        - name: data-volume
+          mountPath: /app/data
+        - name: questions-volume
+          mountPath: /app/questions.txt
+          subPath: questions.txt
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: jeopardy-data
+      - name: questions-volume
+        configMap:
+          name: jeopardy-questions
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jeopardy-backend
+  namespace: jeopardy
+  labels:
+    app: jeopardy-backend
+spec:
+  selector:
+    app: jeopardy-backend
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP

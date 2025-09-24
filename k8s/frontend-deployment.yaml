@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeopardy-frontend
+  namespace: jeopardy
+  labels:
+    app: jeopardy-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jeopardy-frontend
+  template:
+    metadata:
+      labels:
+        app: jeopardy-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: jeopardy-frontend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jeopardy-config
+              key: NEXT_PUBLIC_API_URL
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jeopardy-frontend
+  namespace: jeopardy
+  labels:
+    app: jeopardy-frontend
+spec:
+  selector:
+    app: jeopardy-frontend
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+  type: ClusterIP

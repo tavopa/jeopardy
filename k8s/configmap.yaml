@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jeopardy-config
+  namespace: jeopardy
+data:
+  DATABASE_URL: "sqlite:///./data/jeopardy.db"
+  NEXT_PUBLIC_API_URL: "http://jeopardy-backend.jeopardy.svc.cluster.local:8000"

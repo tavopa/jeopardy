@@ -45,13 +45,16 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isMuted, setIsMuted] = useState(false)
 
+  const API_BASE = (typeof window !== 'undefined' && (window as any).__API_URL__) || (process && process.env && process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:8000'
+  const WS_URL = API_BASE.replace(/^http/i, 'ws') + '/ws'
+
   useEffect(() => {
     // Generate registration URL
     const url = `${window.location.origin}?room=${Date.now()}`
     setRegistrationUrl(url)
 
     // WebSocket connection
-    const websocket = new WebSocket('ws://localhost:8000/ws')
+    const websocket = new WebSocket(WS_URL)
     websocket.onopen = () => {
       websocket.send(JSON.stringify({ type: 'host_connect' }))
     }
@@ -161,7 +164,7 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
 
   const startRegistration = async () => {
     try {
-      const response = await fetch('http://localhost:8000/start-registration', {
+      const response = await fetch(`${API_BASE}/start-registration`, {
         method: 'POST',
       })
       if (response.ok) {
@@ -175,7 +178,7 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
 
   const startGame = async () => {
     try {
-      const response = await fetch('http://localhost:8000/start-game', {
+      const response = await fetch(`${API_BASE}/start-game`, {
         method: 'POST',
       })
       if (response.ok) {
@@ -189,7 +192,7 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
 
   const startFirstQuestion = async () => {
     try {
-      const response = await fetch('http://localhost:8000/start-first-question', {
+      const response = await fetch(`${API_BASE}/start-first-question`, {
         method: 'POST',
       })
       if (response.ok) {
@@ -203,7 +206,7 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
   const nextQuestion = async () => {
     try {
       console.log('Requesting next question...')
-      const response = await fetch('http://localhost:8000/next-question', {
+      const response = await fetch(`${API_BASE}/next-question`, {
         method: 'POST',
       })
       if (response.ok) {
@@ -219,7 +222,7 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8000/users')
+      const response = await fetch(`${API_BASE}/users`)
       const usersData = await response.json()
       setUsers(usersData)
     } catch (error) {
