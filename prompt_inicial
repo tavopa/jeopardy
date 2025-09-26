@@ -1,0 +1,20 @@
+Necesito realizar una aplicación web basada en el jeopardy, que sea una especie de trivias para que un grupo de personas pueda contestarlas, llevar una puntuación y obtener 1 o varios ganadores en base a las respuesta correctas, tiene que tener un aspecto de gamer. Enseguida te defino el proceso.
+
+
+El Host inicia abre el registro de participantes, el sistema debe presentar una URL de registro.
+El grupo de personas abre la URL, donde le presenta un campo para colocar su nombre y el botón de entrar en la sala.
+EL host presiona en iniciar juego y comienza la cuenta regresiva de 30 segundos.
+Una vez terminada la cuenta presenta la primera pregunta con sus 4 opciones.
+Cada usuario deberá seleccionar la que considera indicada y presiona el botón de contestar.
+El límite de tiempo para contestar es de 15 segundos
+El host presiona el botón de siguiente pregunta y comienza cuenta regresiva de 5 segundos y al terminar, presenta la siguiente pregunta, así sucesivamente hasta terminar con las preguntar.
+El sistema debe llevar el control de cuantas respuesta correctas tiene cada usuario.
+Al finalizar deberá presentar al o los usuarios que tiene  más preguntas correctas siendo ganador.
+
+Detalles técnicos
+Las preguntas y posibles respuestas serán cargadas en un archivo txt, define el formato en que lo ocupas para llenarlo de esa manera. Precarga un archivo con preguntas y respuestas basadas en tecnología
+Deberá tener una BD local donde llevará el control de los usuario registrados y las respuestas seleccionadas por cada uno, así como la puntuación.
+Utiliza Python de preferencia para el backend, nextjs con tailwind en el front
+Deberá ser desplegado en contenedores, por lo que debes generar un Docker compose con la implementación.
+Deberá tener animaciones llamativas
+Sé creativo en cuanto al diseño basado en el propio juego mencionado
