@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./questions.txt:/app/questions.txt
-      - ./backend_data:/app/data
+      - jeopardy_data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/jeopardy.db
     restart: unless-stopped
@@ -26,11 +26,13 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backjeopardy.oke-phx-tst.splata.penoles.mx
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      #- NEXT_PUBLIC_API_URL=http://backjeopardy.oke-phx-tst.splata.penoles.mx
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  backend_data:
+  jeopardy_data:
+    driver: local

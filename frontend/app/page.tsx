@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trophy, Users, Play, Settings, Zap, Star } from 'lucide-react'
+import { Trophy, Users, Play, Settings, Zap, Star, Database } from 'lucide-react'
 import HostPanel from './components/HostPanel'
 import PlayerPanel from './components/PlayerPanel'
 import GameBoard from './components/GameBoard'
@@ -26,7 +26,12 @@ export default function Home() {
     }
   }, [])
 
-  const handleRoleSelection = (role: 'host' | 'player') => {
+  const handleRoleSelection = (role: 'host' | 'player' | 'admin') => {
+    if (role === 'admin') {
+      // Redirect to admin panel
+      window.location.href = '/admin'
+      return
+    }
     setIsHost(role === 'host')
     setShowRoleSelection(false)
   }
@@ -80,7 +85,7 @@ export default function Home() {
               </motion.div>
 
               <motion.div 
-                className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl"
+                className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl"
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1 }}
@@ -143,6 +148,37 @@ export default function Home() {
                       whileTap={{ scale: 0.98 }}
                     >
                       JUGAR
+                    </motion.button>
+                  </div>
+                </motion.div>
+
+                {/* Admin Card */}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="game-board p-8 rounded-2xl cursor-pointer group"
+                >
+                  <div className="text-center">
+                    <motion.div
+                      className="mx-auto mb-6 w-20 h-20 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center"
+                      whileHover={{ rotate: 360 }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <Database className="w-10 h-10 text-black" />
+                    </motion.div>
+                    <h2 className="text-3xl font-bold text-purple-400 mb-4 group-hover:text-purple-300 transition-colors">
+                      ADMIN
+                    </h2>
+                    <p className="text-gray-300 mb-6">
+                      Gestiona las preguntas del juego y configura el contenido
+                    </p>
+                    <motion.button
+                      onClick={() => handleRoleSelection('admin')}
+                      className="neon-button px-8 py-4 rounded-xl font-bold text-black text-lg w-full"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      ADMINISTRAR
                     </motion.button>
                   </div>
                 </motion.div>
