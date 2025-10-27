@@ -9,9 +9,15 @@ import json
 import asyncio
 from datetime import datetime
 import os
+import random
 
 # Database setup
-DATABASE_URL = "sqlite:///./jeopardy.db"
+# Use environment variable or default to data directory
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/jeopardy.db")
+
+# Ensure data directory exists
+os.makedirs("./data", exist_ok=True)
+
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -269,11 +275,11 @@ async def start_game(db: Session = Depends(get_db)):
     game_state["current_question"] = None
     game_state["question_timer"] = 0
     
-    # Reset previous game data to avoid duplicates/loops
+    # Reset previous game data
     try:
-        # Clear previous questions and answers
+        # Clear previous answers and reset active state
         db.query(UserAnswer).delete()
-        db.query(Question).delete()
+        db.query(Question).update({"is_active": False})
         # Reset user scores
         db.query(User).update({User.score: 0})
         db.commit()
@@ -281,10 +287,8 @@ async def start_game(db: Session = Depends(get_db)):
         db.rollback()
         print(f"Error resetting game data: {e}")
 
-    # Load and save fresh questions to database
-    questions_data = load_questions()
-    for question_data in questions_data:
-        save_question(db, question_data)
+    # Note: Questions are now managed through the admin panel
+    # and persist in the database
     
     await manager.broadcast(json.dumps({
         "type": "game_started",
@@ -296,13 +300,19 @@ async def start_game(db: Session = Depends(get_db)):
 
 @app.post("/start-first-question")
 async def start_first_question(db: Session = Depends(get_db)):
-    # Get first question ordered by ID to ensure deterministic start
-    first_q = (
+    # Get all available questions and select randomly
+    available_questions = (
         db.query(Question)
         .filter(Question.is_active == False)
-        .order_by(Question.id.asc())
-        .first()
+        .all()
     )
+    
+    if not available_questions:
+        return {"error": "No questions available"}
+    
+    # Select a random question
+    first_q = random.choice(available_questions)
+    
     if first_q:
         first_q.is_active = True
         db.commit()
@@ -344,18 +354,20 @@ async def next_question(db: Session = Depends(get_db)):
     for q in all_questions:
         print(f"Question {q.id}: active={q.is_active}, text={q.question_text[:50]}...")
     
-    # Determine next question: pick the next ID after current one
-    current_id = game_state.get("current_question")
-    next_q = None
-    if current_id:
-        next_q = (
-            db.query(Question)
-            .filter(Question.is_active == False, Question.id > current_id)
-            .order_by(Question.id.asc())
-            .first()
-        )
+    # Get all available questions and select randomly
+    available_questions = (
+        db.query(Question)
+        .filter(Question.is_active == False)
+        .all()
+    )
     
-    # Fallback: if no current or at end, there is no next question
+    print(f"Available questions: {len(available_questions)}")
+    
+    next_q = None
+    if available_questions:
+        # Select a random question from available ones
+        next_q = random.choice(available_questions)
+    
     print(f"Found next question: {next_q}")
     if next_q:
         next_q.is_active = True
@@ -425,6 +437,77 @@ async def submit_answer(answer: AnswerSubmit, db: Session = Depends(get_db)):
         db.commit()
     
     return {"correct": is_correct, "score": user.score if user else 0}
+
+# Question Management Endpoints
+@app.get("/questions")
+async def get_all_questions(db: Session = Depends(get_db)):
+    """Get all questions from database (for admin panel)"""
+    questions = db.query(Question).all()
+    return [QuestionResponse(
+        id=q.id,
+        question_text=q.question_text,
+        option_a=q.option_a,
+        option_b=q.option_b,
+        option_c=q.option_c,
+        option_d=q.option_d
+    ) for q in questions]
+
+@app.post("/questions")
+async def create_question(question: dict, db: Session = Depends(get_db)):
+    """Create a new question"""
+    try:
+        new_question = Question(
+            question_text=question['question_text'],
+            option_a=question['option_a'],
+            option_b=question['option_b'],
+            option_c=question['option_c'],
+            option_d=question['option_d'],
+            correct_answer=question['correct_answer'],
+            is_active=False
+        )
+        db.add(new_question)
+        db.commit()
+        db.refresh(new_question)
+        return {"message": "Question created", "id": new_question.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/questions/{question_id}")
+async def update_question(question_id: int, question: dict, db: Session = Depends(get_db)):
+    """Update an existing question"""
+    try:
+        db_question = db.query(Question).filter(Question.id == question_id).first()
+        if not db_question:
+            raise HTTPException(status_code=404, detail="Question not found")
+        
+        db_question.question_text = question['question_text']
+        db_question.option_a = question['option_a']
+        db_question.option_b = question['option_b']
+        db_question.option_c = question['option_c']
+        db_question.option_d = question['option_d']
+        db_question.correct_answer = question['correct_answer']
+        
+        db.commit()
+        return {"message": "Question updated"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/questions/{question_id}")
+async def delete_question(question_id: int, db: Session = Depends(get_db)):
+    """Delete a question"""
+    try:
+        db_question = db.query(Question).filter(Question.id == question_id).first()
+        if not db_question:
+            raise HTTPException(status_code=404, detail="Question not found")
+        
+        db.delete(db_question)
+        db.commit()
+        return {"message": "Question deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
