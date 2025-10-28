@@ -47,6 +47,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
   const [localGameState, setLocalGameState] = useState(gameState)
   const [winnerCountdown, setWinnerCountdown] = useState(0)
   const [winnerName, setWinnerName] = useState('')
+  const [roomId, setRoomId] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isMuted, setIsMuted] = useState(false)
 
@@ -54,8 +55,13 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
   const WS_URL = API_BASE.replace(/^http/i, 'ws') + '/ws'
 
   useEffect(() => {
-    // WebSocket connection
-    const websocket = new WebSocket(WS_URL)
+    // Get room ID from URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const roomFromUrl = urlParams.get('room') || 'default'
+    setRoomId(roomFromUrl)
+
+    // WebSocket connection with room ID
+    const websocket = new WebSocket(`${WS_URL}?room_id=${roomFromUrl}`)
     websocket.onopen = () => {
       console.log('Connected to game server')
     }
@@ -164,7 +170,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
   }
 
   const registerPlayer = async () => {
-    if (!playerName.trim()) return
+    if (!playerName.trim() || !roomId) return
 
     try {
       const response = await fetch(`${API_BASE}/register`, {
@@ -175,6 +181,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
         body: JSON.stringify({
           name: playerName,
           is_host: false,
+          room_id: roomId,
         }),
       })
 
@@ -189,7 +196,24 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
   }
 
   const submitAnswer = async () => {
-    if (!selectedAnswer || !currentQuestion || !userId) return
+    if (!selectedAnswer || !currentQuestion || !userId || !roomId) {
+      console.error('Missing required data:', {
+        selectedAnswer,
+        currentQuestion: currentQuestion?.id,
+        userId,
+        roomId
+      })
+      return
+    }
+
+    const payload = {
+      user_id: userId,
+      question_id: currentQuestion.id,
+      selected_answer: selectedAnswer,
+      room_id: roomId,
+    }
+    
+    console.log('Submitting answer:', payload)
 
     try {
       const response = await fetch(`${API_BASE}/submit-answer`, {
@@ -197,11 +221,7 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          user_id: userId,
-          question_id: currentQuestion.id,
-          selected_answer: selectedAnswer,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -209,15 +229,21 @@ export default function PlayerPanel({ gameState, isFromUrl = false }: { gameStat
         setIsCorrect(result.correct)
         setAnswerSubmitted(true)
         setShowResult(true)
+      } else {
+        const errorText = await response.text()
+        console.error('Error response:', response.status, errorText)
+        alert(`Error al enviar respuesta: ${errorText}`)
       }
     } catch (error) {
       console.error('Error submitting answer:', error)
+      alert(`Error al enviar respuesta: ${error}`)
     }
   }
 
   const fetchUsers = async () => {
+    if (!roomId) return
     try {
-      const response = await fetch(`${API_BASE}/users`)
+      const response = await fetch(`${API_BASE}/users?room_id=${roomId}`)
       const usersData = await response.json()
       setUsers(usersData)
     } catch (error) {

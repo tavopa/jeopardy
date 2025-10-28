@@ -78,7 +78,8 @@ try:
                 option_c=q_data["option_c"],
                 option_d=q_data["option_d"],
                 correct_answer=q_data["correct_answer"],
-                is_active=False
+                is_active=False,
+                room_id=None  # Global questions, not tied to any specific room
             )
             db.add(question)
         db.commit()

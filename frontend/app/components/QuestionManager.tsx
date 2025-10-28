@@ -27,7 +27,8 @@ export default function QuestionManager() {
     correct_answer: 'A'
   })
 
-  const API_BASE = (typeof window !== 'undefined' && (window as any).__API_URL__) || 'http://localhost:8000'
+  
+  const API_BASE = (typeof window !== 'undefined' && (window as any).__API_URL__) || (process && process.env && process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:8000'
 
   useEffect(() => {
     fetchQuestions()
