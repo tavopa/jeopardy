@@ -54,6 +54,12 @@ class UserAnswer(Base):
     room_id = Column(String, index=True)  # Add room_id to track answers per room
     answered_at = Column(DateTime, default=datetime.utcnow)
 
+class RoomUsedQuestion(Base):
+    __tablename__ = "room_used_questions"
+    id = Column(Integer, primary_key=True, index=True)
+    room_id = Column(String, index=True)
+    question_id = Column(Integer, index=True)
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -155,7 +161,8 @@ def get_game_state(room_id: str) -> Dict:
             "is_question_active": False,
             "current_question": None,
             "time_remaining": 0,
-            "question_timer": 0
+            "question_timer": 0,
+            "asked_ids": []  # track asked question ids per room for this game session
         }
     return game_states[room_id]
 
@@ -309,13 +316,14 @@ async def start_game(room_id: str, db: Session = Depends(get_db)):
     room_game_state["is_question_active"] = False
     room_game_state["current_question"] = None
     room_game_state["question_timer"] = 0
+    room_game_state["asked_ids"] = []
     
-    # Reset previous game data for this room only
+    # Reset previous game data for this room only (scores/answers), and reset active question globally
     try:
         # Clear previous answers for this room
         db.query(UserAnswer).filter(UserAnswer.room_id == room_id).delete()
-        # Reset active questions for this room
-        db.query(Question).filter(Question.room_id == room_id).update({"is_active": False})
+        # Reset questions globally to be part of the global bank (room-agnostic)
+        db.query(Question).update({"is_active": False, "room_id": None})
         # Reset user scores for this room
         db.query(User).filter(User.room_id == room_id).update({User.score: 0})
         db.commit()
@@ -336,42 +344,20 @@ async def start_game(room_id: str, db: Session = Depends(get_db)):
 
 @app.post("/start-first-question")
 async def start_first_question(room_id: str, db: Session = Depends(get_db)):
-    # Get all available questions for this room and select randomly
-    # First, check if there are questions assigned to this room
-    room_questions = (
-        db.query(Question)
-        .filter(Question.room_id == room_id, Question.is_active == False)
-        .all()
-    )
-    
-    # If no room-specific questions, create copies of global questions for this room
-    if not room_questions:
-        global_questions = db.query(Question).filter(Question.room_id == None).all()
-        if global_questions:
-            for q in global_questions:
-                room_question = Question(
-                    question_text=q.question_text,
-                    option_a=q.option_a,
-                    option_b=q.option_b,
-                    option_c=q.option_c,
-                    option_d=q.option_d,
-                    correct_answer=q.correct_answer,
-                    is_active=False,
-                    room_id=room_id
-                )
-                db.add(room_question)
-            db.commit()
-            room_questions = (
-                db.query(Question)
-                .filter(Question.room_id == room_id, Question.is_active == False)
-                .all()
-            )
-    
-    if not room_questions:
+    # Use global questions (room_id is None);
+    # avoid repeats per room using asked_ids and questions already answered in this room
+    room_game_state = get_game_state(room_id)
+    asked_ids = room_game_state.get("asked_ids", [])
+    used_ids = [qid for (qid,) in db.query(RoomUsedQuestion.question_id).filter(RoomUsedQuestion.room_id == room_id).distinct().all()]
+    exclude_ids = set(asked_ids) | set(used_ids)
+    query = db.query(Question).filter(Question.room_id == None, Question.is_active == False)
+    if exclude_ids:
+        query = query.filter(~Question.id.in_(list(exclude_ids)))
+    available = query.all()
+    if not available:
         return {"error": "No questions available"}
-    
     # Select a random question
-    first_q = random.choice(room_questions)
+    first_q = random.choice(available)
     
     if first_q:
         first_q.is_active = True
@@ -381,6 +367,16 @@ async def start_first_question(room_id: str, db: Session = Depends(get_db)):
         room_game_state["current_question"] = first_q.id
         room_game_state["is_question_active"] = True
         room_game_state["question_timer"] = 15
+        # track asked question
+        # persist as used for this room
+        db.add(RoomUsedQuestion(room_id=room_id, question_id=first_q.id))
+        db.commit()
+        # also keep in memory
+        try:
+            if first_q.id not in room_game_state["asked_ids"]:
+                room_game_state["asked_ids"].append(first_q.id)
+        except Exception:
+            room_game_state["asked_ids"] = [first_q.id]
         
         question_data = QuestionResponse(
             id=first_q.id,
@@ -407,22 +403,23 @@ async def start_first_question(room_id: str, db: Session = Depends(get_db)):
 async def next_question(room_id: str, db: Session = Depends(get_db)):
     print(f"Next question requested for room {room_id}")
     # Set current question as inactive for this room
-    set_question_inactive(db, room_id)
+    set_question_inactive(db, None)
     
-    # Get all questions for this room to debug
-    #all_questions = db.query(Question).filter(Question.room_id == room_id).all()
-    all_questions = db.query(Question).filter().all()
-    print(f"Total questions in room {room_id}: {len(all_questions)}")
+    # Debug: total global questions
+    all_questions = db.query(Question).filter(Question.room_id == None).all()
+    print(f"Total global questions: {len(all_questions)}")
     for q in all_questions:
         print(f"Question {q.id}: active={q.is_active}, text={q.question_text[:50]}...")
     
-    # Get all available questions for this room and select randomly
-    available_questions = (
-        db.query(Question)
-        #.filter(Question.room_id == room_id, Question.is_active == False)
-        .filter(Question.is_active == False)
-        .all()
-    )
+    # Get all available global questions and select randomly, excluding asked in this room
+    room_game_state = get_game_state(room_id)
+    asked_ids = room_game_state.get("asked_ids", [])
+    used_ids = [qid for (qid,) in db.query(RoomUsedQuestion.question_id).filter(RoomUsedQuestion.room_id == room_id).distinct().all()]
+    exclude_ids = set(asked_ids) | set(used_ids)
+    query = db.query(Question).filter(Question.room_id == None, Question.is_active == False)
+    if exclude_ids:
+        query = query.filter(~Question.id.in_(list(exclude_ids)))
+    available_questions = query.all()
     
     print(f"Available questions for room {room_id}: {len(available_questions)}")
     
@@ -434,13 +431,22 @@ async def next_question(room_id: str, db: Session = Depends(get_db)):
     print(f"Found next question: {next_q}")
     if next_q:
         next_q.is_active = True
-        next_q.room_id = room_id  # Assign room_id to the active question
         db.commit()
         
         room_game_state = get_game_state(room_id)
         room_game_state["current_question"] = next_q.id
         room_game_state["is_question_active"] = True
         room_game_state["question_timer"] = 15
+        # track asked question
+        # persist as used for this room
+        db.add(RoomUsedQuestion(room_id=room_id, question_id=next_q.id))
+        db.commit()
+        # also keep in memory
+        try:
+            if next_q.id not in room_game_state["asked_ids"]:
+                room_game_state["asked_ids"].append(next_q.id)
+        except Exception:
+            room_game_state["asked_ids"] = [next_q.id]
         
         question_data = QuestionResponse(
             id=next_q.id,
@@ -465,6 +471,7 @@ async def next_question(room_id: str, db: Session = Depends(get_db)):
         room_game_state = get_game_state(room_id)
         room_game_state["is_question_active"] = False
         room_game_state["is_game_started"] = False
+        room_game_state["asked_ids"] = []
         users = get_users(db, room_id)
         leaderboard = sorted(users, key=lambda x: x.score, reverse=True)
         
