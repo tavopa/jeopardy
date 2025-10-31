@@ -409,6 +409,17 @@ export default function HostPanel({ onGameStateChange }: { onGameStateChange: (s
                   <Zap className="w-6 h-6 inline mr-2" />
                   SIGUIENTE PREGUNTA
                 </motion.button>
+
+                {currentQuestion && (
+                  <GameBoard
+                    currentQuestion={currentQuestion}
+                    questionTimer={questionTimer}
+                    timeRemaining={timeRemaining}
+                    onNextQuestion={nextQuestion}
+                    isPlayer={false}
+                  />
+                )}
+                
               </div>
             </div>
             

@@ -135,7 +135,7 @@ export default function GameBoard({
                   disabled={answerSubmitted || !isPlayer}
                 >
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center text-black font-bold text-lg">
+                     <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center text-black font-bold text-lg">
                       {option.letter}
                     </div>
                     <span className="text-left flex-1">{option.value}</span>
