@@ -130,15 +130,17 @@ class ConnectionManager:
 
     async def broadcast(self, message: str, room_id: str = "default"):
         if room_id not in self.active_connections:
+            print(f"WARNING: No connections found for room {room_id}. Available rooms: {list(self.active_connections.keys())}")
             return
         connections = self.active_connections[room_id]
         print(f"Broadcasting to {len(connections)} connections in room {room_id}")
+        print(f"Message content: {message[:200]}...")  # Log first 200 chars
         for i, connection in enumerate(connections):
             try:
                 await connection.send_text(message)
-                print(f"Message sent to connection {i} in room {room_id}")
+                print(f"✓ Message sent successfully to connection {i} in room {room_id}")
             except Exception as e:
-                print(f"Error sending to connection {i} in room {room_id}: {e}")
+                print(f"✗ Error sending to connection {i} in room {room_id}: {e}")
                 pass
 
     async def broadcast_to_host(self, message: str, room_id: str = "default"):
@@ -622,7 +624,11 @@ async def delete_question(question_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, room_id: str = "default"):
+async def websocket_endpoint(websocket: WebSocket):
+    # Extract room_id from query parameters
+    query_params = websocket.query_params
+    room_id = query_params.get("room_id", "default")
+    print(f"WebSocket connection: room_id={room_id}")
     await manager.connect(websocket, room_id)
     try:
         while True:
